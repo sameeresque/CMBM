@@ -1,0 +1,10 @@
+# Core dependencies for CMBM package
+numpy>=1.24.4
+scipy>=1.10.1
+pandas>=2.0.3
+astropy>=5.2.2
+ultranest>=4.4.0
+VoigtFit>=3.21.3
+mpi4py>=3.1.5
+pyyaml>=5.4.1
+roman>=3.0

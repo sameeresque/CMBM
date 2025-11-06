@@ -1,0 +1,129 @@
+# Default configuration for CMBM
+# Cloud-by-cloud Multiphase Bayesian ionization Modeling
+
+# ==============================================================================
+# DATA PATHS - Update these paths for your data
+# ==============================================================================
+dataset_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/VP/savegoodresult3.hdf5"                          # Path to VoigtFit dataset (.hdf5)
+voigtfit_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/VP/bestfit_result3.pickle"                         # Path to VoigtFit results (.pickle)  
+mask_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/Mask/mask.pkl"                             # Path to velocity masks (.pkl)
+transition_library_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/Atomdata/atomdata_updated_new.dat"              # Path to atomic transition data file
+
+# Grid paths for Cloudy models
+grid_paths:
+  gridpath: "/scratch/sameer/"       # Thin grid directory
+  gridpath_thick: "/scratch/sameer/" # Thick grid directory
+
+grid_z: "0.2"                              # Grid redshift identifier
+
+# ==============================================================================
+# FITTING CONFIGURATION
+# ==============================================================================
+
+# Phase structure - defines the physical components to fit
+# Each phase can contain multiple clouds with different ionization states
+phases:
+  Ph1: ["SiIII_0", "HI_1"]
+
+
+# Spectral lines to include in the fit
+use_lines: [
+  "CII_1334", "CII_1036", "CIII_977", "FeII_1144", 
+  "HI_1215", "HI_1025", "HI_972", "HI_949", "HI_937", "HI_930", "HI_926",
+  "MgI_2852", "MgII_2796", "NII_1083", "NV_1238", "OI_1302", "OVI_1031",
+  "SII_1253", "SIII_1012", "SiII_1190", "SiIII_1206", "SiIV_1393"
+]
+
+# Available ions in Cloudy grids (used for column density interpolation)
+cloudy_ions: [
+  "MgX", "AlII", "AlIII", "SIV", "CII", "HI", "CIV", "CIII", "SII", "TiII",
+  "MgII", "NI", "OIII", "NaI", "SiII", "SiIII", "PIII", "NeVIII", "CaI", "FeI",
+  "ZnII", "MnII", "SiIV", "SiI", "PI", "MgI", "NV", "CI", "SIII", "SVI",
+  "FeII", "OIV", "CaII", "NII", "OII", "OI", "NIII", "AlI", "SI", "PII", "OV", "OVI"
+]
+# ==============================================================================
+# MASKING CONFIGURATION
+# ==============================================================================
+
+masks:
+  velocity_limits:
+    lowlim: -160
+    uplim: 190
+    maxvel: 500
+  custom_masks:
+    CIII_977: [[-500, 5], [190, 500]]
+
+# ==============================================================================
+# NESTED SAMPLING PARAMETERS
+# ==============================================================================
+
+# Basic sampling settings
+min_num_live_points: 400                    # Number of live points
+dlogz: 0.5                                  # Target evidence accuracy (will be adjusted by ndim)
+min_ess: 400                                # Minimum effective sample size
+nsteps_factor: 2                            # Step sampler steps = nsteps_factor * ndim
+
+# Advanced sampling settings
+update_interval_volume_fraction: 0.2        # Volume update interval
+max_num_improvement_loops: -1               # Maximum improvement loops (-1 = no limit)
+
+# ==============================================================================
+# OUTPUT SETTINGS
+# ==============================================================================
+
+output_dir: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/SiIII0HI1"                  # Output directory name
+resume: true                                # Resume previous run if available
+
+# ==============================================================================
+# GALAXY REDSHIFT
+# ==============================================================================
+
+# System redshift from VoigtFit dataset (z_sys)
+# This is automatically loaded from the VoigtFit file
+
+# Galaxy redshift for velocity reference in plots
+# If not specified (null), z_sys will be used
+zgal: 0.2284
+# Example: zgal: 0.2284
+
+
+# ==============================================================================
+# PLOTTING CONFIGURATION
+# ==============================================================================
+
+plotting:
+  # Velocity range for plots [vmin, vmax] in km/s
+  velocity_range: [-30, 390]
+  # Lines to exclude from model comparison plot
+  deactivate_lines: ['CI_945','CI_1328','NI_1199','SIV_1062',
+ 'CaII_3969',
+ 'FeIII_1122',
+ 'FeII_1063',
+ 'FeII_1096',
+ 'FeII_1143',
+ 'FeII_2586',
+ 'NI_1201',
+ 'OI_1039',
+ 'SII_1259',
+ 'SI_1295',
+ 'SVI_944',
+ 'SiII_1020']
+
+  
+  # Lines to show as fully masked (grayed out)
+  masked_lines: []
+
+
+
+# ==============================================================================
+# SLURM JOB SETTINGS
+# ==============================================================================
+
+slurm:
+  job_name: "SiIII0HI1"           # Job name (-J flag)
+  partition: "sooner_test"       # Partition name (--partition)
+  container: "el9hw"             # Container image (--container)
+  nodes: 1                       # Number of nodes (--nodes)
+  ntasks_per_node: 8             # MPI tasks per node (--ntasks-per-node)
+  mem_per_cpu: "16G"             # Memory per CPU (--mem-per-cpu)
+  time: "04:00:00"               # Wall time (--time, HH:MM:SS)
