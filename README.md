@@ -244,10 +244,6 @@ From the 5 fitted parameters, CMBM computes:
 - **Velocity**: Relative to galaxy redshift
 - **Ion-specific b-parameters**: Including thermal broadening
 
-### Bayesian Curve Fitting
-
-## Scientific Method (Detailed)
-
 ### Bayesian Framework
 
 CMBM uses a Bayesian approach to fit absorption line systems:
@@ -416,7 +412,7 @@ output_dir/
 
 ## Post-processing and Analysis
 
-After fitting, analyze your results with the comprehensive post-processing tool:
+After fitting, analyze your results with the post-processing tool:
 
 ### Basic Usage
 ```bash
