@@ -33,11 +33,7 @@
 
 ## Installation
 
-```bash
-pip install cmbm
-```
-
-Or install from source:
+Install from source preferrably in a virtual environment:
 ```bash
 git clone https://github.com/sameeresque/cmbm.git
 cd cmbm
@@ -322,41 +318,33 @@ CMBM requires several input files:
    - Created by VoigtFit's fitting procedure
 
 3. **Velocity Masks** (`.pkl`): Velocity regions to exclude in fits
-   - Dictionary specifying masked velocity ranges per line
+   - Dictionary specifying masked velocity ranges for different lines
    - Can be created with custom scripts or VoigtFit utilities
-   - For ions with multiple transitions, the apparent optical depth (AOD) technique (Savage & Sembach 1991)
-     can be used to identify blends and contamination by comparing the apparent 
-     column density profiles across transitions of same species. Regions where profiles disagree 
-     could indicate contamination/saturation.
-   - For ions with a single transition, a full identification of all spectral features 
+   - For ions with multiple transitions, the apparent optical depth (AOD) technique (Savage & Sembach 1991) can be used to identify blends and contamination by comparing the apparent column density profiles across transitions of same species. Regions where profiles disagree could indicate contamination/saturation.
+   - For ions with a single transition within the observable window, a full identification of all spectral features 
      is encouraged to ensure the absorption is real and not a misidentification of an unrelated feature.
 
 4. **Cloudy Grids**: Precomputed photoionization model grids
-   - Two separate ionization grids each corresponding to optically thin and optically thick regimes are recommended. These are to be supplied as pre-built interpolant dictionaries and specified in the config file. Each pkl file is a dictionary mapping ion names (e.g. `'CII'`, `'MgII'`) plus 
+   - Two separate ionization grids each corresponding to optically thin and optically thick regimes are recommended. These are to be supplied as pre-built interpolant dictionaries and specified in the config file. Each pickle file is a dictionary mapping ion names (e.g. `'CII'`, `'MgII'`) plus 
    `'logNHtot'` and `'logT'` to `RegularGridInterpolator` objects. The column densities are in log units.
 
-   The predicted ion column densities scale with metallicity and relative abundance as:
+    The predicted ion column densities scale with metallicity and relative abundance as:
+    ```
+    log N(k,j) = log N(m)(k,j) + ΔZ + Δ[Xk/H]
+    ```
+    
+    where `ΔZ` is the logarithmic offset in metallicity and `Δ[Xk/H]` is the logarithmic 
+    scaled abundance of ion k relative to the model grid value. For optically thin clouds 
+    (`log N_HI < 16`), an additional scaling with neutral hydrogen column density applies:
+    ```
+    log N(k,j) = log N(m)(k,j) + Δ(N_HI) + ΔZ + Δ[Xk/H]
+    ```
+    
+    where `Δ(N_HI) = log N_HI − log N(m)_HI`. This scaling means that in the optically thin regime a single representative model cloud can be scaled rather than building a full grid, saving substantial compute time. These scaling laws also imply degeneracies: for all clouds there is a degeneracy between `N(k,j)` and `Z/Z_sun` (and `[Xk/H]` for ion k), while for optically thin clouds there is an additional degeneracy between `N(k,j)` and `N_HI`.
 
-   log N_{k,j} = log N^(m)_{k,j} + ΔZ + Δ[X_k/H]
+   Per-cloud abundance offsets for individual elements (e.g. Mg, N, C) can be specified via the `alpha_params` config block.
 
-   where ΔZ is the logarithmic offset in metallicity and Δ[X_k/H] is the logarithmic 
-   scaled abundance of ion k relative to the model grid value. For optically thin clouds 
-   (log N_HI < 16), an additional scaling with neutral hydrogen 
-   column density applies:
-
-   log N_{k,j} = log N^(m)_{k,j} + Δ(N_HI) + ΔZ + Δ[X_k/H]
-
-   where Δ(N_HI) = log N_HI − log N^(m)_HI. This scaling means that in the optically 
-   thin regime a single representative model cloud can be scaled rather than building 
-   a full grid, saving substantial compute time. These scaling laws also imply 
-   degeneracies: for all clouds there is a degeneracy between N_{k,j} and Z/Z_sun 
-   (and [X_k/H] for ion k), while for optically thin clouds there is an additional 
-   degeneracy between N_{k,j} and N_HI.
-
-   Per-cloud abundance offsets for individual elements (e.g. Mg, N, C) can be 
-   specified via the `alpha_params` config block.
-
-   For more information, the user is encouraged to refer to the Chapter 35 of textbook Quasar Absorption Lines Volume 2 - Astrophysics, Analysis and Modeling by Christopher Churchill.
+    For more information on building grids of models, the user is encouraged to refer to the Chapter 35 of textbook Quasar Absorption Lines Volume 2 - Astrophysics, Analysis and Modeling by Christopher Churchill.
 
 6. **Atomic Data** (`.dat`): Transition wavelengths, oscillator strengths, damping constants
    - Standard format atomic line database
@@ -467,7 +455,7 @@ python postprocess/extract_parameters.py \
 - `--skip_corner`: Skip corner plot generation
 - `--n_processes`: Number of parallel processes (default: 12)
 
-### Skip Flags Explained
+### Skip Flags
 
 The skip flags allow you to avoid recomputing time-consuming steps when re-running analysis:
 
@@ -489,9 +477,9 @@ The model comparison plot (`model_comparison.pdf`) shows:
 **Left panels**: Absorption line profiles with:
 - Gray points: Observed data with error bars
 - Colored lines: Individual cloud models
-- Black line: Combined model (all clouds)
+- Black line: Combined model (superposition of all clouds)
 - Gray shading: Masked regions
-- Vertical colored lines: Cloud velocities
+- Vertical colored lines: Cloud centroid velocities
 
 **Right panel**: Parameter distributions as violin plots showing:
 - Filled violins: 1σ posterior distributions
