@@ -266,9 +266,9 @@ where $\varepsilon_i$ represents Gaussian measurement uncertainties with standar
 
 The likelihood of observing the data given the model parameters is:
 
-$$p(\mathbf{D} \mid \boldsymbol{\theta}, M) = \prod_{i=1}^{N} \frac{1}{\sigma_i \sqrt{2\pi}} \exp\!\left[-\frac{1}{2}\left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right]$$
+$$p(\mathbf{D} \mid \boldsymbol{\theta}, M) = \prod_{i=1}^{N} \frac{1}{\sigma_i \sqrt{2\pi}} \exp\left[-\frac{1}{2}\left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right]$$
 
-$$\propto \exp\!\left[-\frac{1}{2} \sum_i \left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right] = \exp\!\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
+$$\propto \exp\left[-\frac{1}{2} \sum_i \left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right] = \exp\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
 
 where $\chi^2(\boldsymbol{\theta})$ is the chi-squared statistic measuring goodness of fit.
 
@@ -276,7 +276,7 @@ where $\chi^2(\boldsymbol{\theta})$ is the chi-squared statistic measuring goodn
 
 Using Bayes' theorem with prior density $\pi(\boldsymbol{\theta})$:
 
-$$p(\boldsymbol{\theta} \mid \mathbf{D}, M) \propto \pi(\boldsymbol{\theta}) \times p(\mathbf{D} \mid \boldsymbol{\theta}, M) \propto \pi(\boldsymbol{\theta}) \exp\!\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
+$$p(\boldsymbol{\theta} \mid \mathbf{D}, M) \propto \pi(\boldsymbol{\theta}) \times p(\mathbf{D} \mid \boldsymbol{\theta}, M) \propto \pi(\boldsymbol{\theta}) \exp\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
 
 The posterior distribution combines prior knowledge with observational constraints.
 
