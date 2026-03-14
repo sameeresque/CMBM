@@ -254,34 +254,29 @@ CMBM uses a Bayesian approach to fit absorption line systems:
 
 #### Setup
 
-The observed data **D** = {d_i} are measurements of an underlying model function f(λ; **θ**) at N spectral pixels, where **θ** = {Z, n_H, N(HI), b_nt, z} are the physical parameters for each cloud in photoionization equilibrium.
+The observed data $\mathbf{D} = \{d_i\}$ are measurements of an underlying model function $f(\lambda; \boldsymbol{\theta})$ at $N$ spectral pixels, where $\boldsymbol{\theta} = \{Z, n_H, N(\text{HI}), b_{nt}, z\}$ are the physical parameters for each cloud in photoionization equilibrium.
 
 The relationship between data and model:
-```
-d_i = f_i(θ) + ε_i,    ε_i ~ N(0, σ_i²)
-```
-where ε_i represents Gaussian measurement uncertainties with standard deviation σ_i.
+
+$$d_i = f_i(\boldsymbol{\theta}) + \varepsilon_i, \qquad \varepsilon_i \sim \mathcal{N}(0, \sigma_i^2)$$
+
+where $\varepsilon_i$ represents Gaussian measurement uncertainties with standard deviation $\sigma_i$.
 
 #### Likelihood Function
 
 The likelihood of observing the data given the model parameters is:
-```
-p(D|θ, M) = ∏[i=1 to N] (1/(σ_i√(2π))) exp[-(1/2)((d_i - f_i(θ))/σ_i)²]
 
-           ∝ exp[-(1/2) Σ_i ((d_i - f_i(θ))/σ_i)²]
-           
-           = exp[-χ²(θ)/2]
-```
+$$p(\mathbf{D} \mid \boldsymbol{\theta}, M) = \prod_{i=1}^{N} \frac{1}{\sigma_i \sqrt{2\pi}} \exp\!\left[-\frac{1}{2}\left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right]$$
 
-where χ²(θ) is the chi-squared statistic measuring goodness of fit.
+$$\propto \exp\!\left[-\frac{1}{2} \sum_i \left(\frac{d_i - f_i(\boldsymbol{\theta})}{\sigma_i}\right)^2\right] = \exp\!\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
+
+where $\chi^2(\boldsymbol{\theta})$ is the chi-squared statistic measuring goodness of fit.
 
 #### Posterior Distribution
 
-Using Bayes' theorem with prior density π(θ):
-```
-p(θ|D, M) ∝ π(θ) × p(D|θ, M)
-          ∝ π(θ) exp[-χ²(θ)/2]
-```
+Using Bayes' theorem with prior density $\pi(\boldsymbol{\theta})$:
+
+$$p(\boldsymbol{\theta} \mid \mathbf{D}, M) \propto \pi(\boldsymbol{\theta}) \times p(\mathbf{D} \mid \boldsymbol{\theta}, M) \propto \pi(\boldsymbol{\theta}) \exp\!\left[-\frac{\chi^2(\boldsymbol{\theta})}{2}\right]$$
 
 The posterior distribution combines prior knowledge with observational constraints.
 
