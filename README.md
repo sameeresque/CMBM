@@ -344,7 +344,7 @@ CMBM requires several input files:
 
    Per-cloud abundance offsets for individual elements (e.g. Mg, N, C) can be specified via the `alpha_params` config block.
 
-    For more information on building grids of models, the user is encouraged to refer to the Chapter 35 of textbook Quasar Absorption Lines Volume 2 - Astrophysics, Analysis and Modeling by Christopher Churchill.
+    For more information on building grids of models, the user is encouraged to refer to Chapter 35 of the textbook Quasar Absorption Lines Volume 2 - Astrophysics, Analysis and Modeling by Christopher Churchill.
 
 6. **Atomic Data** (`.dat`): Transition wavelengths, oscillator strengths, damping constants
    - Standard format atomic line database
@@ -545,14 +545,14 @@ CMBM is released under the MIT License. See [LICENSE](LICENSE) for details.
 
 The development of this package benefited greatly from discussions with my PhD advisor, 
 Jane Charlton, and collaborators Chris Churchill, Glenn Kacprzak, Nicolas Lehner, 
-J. Christopher Howk, Nikole Nielsen, Bart Wakker, and several others.
+J. Christopher Howk, Nikole Nielsen, Bart Wakker, Anand Narayanan, and several others.
 
 CMBM builds upon:
+- [Cloudy](https://gitlab.nublado.org/cloudy/cloudy/-/wikis/home) photoionization code
 - [VoigtFit](https://github.com/jkrogager/VoigtFit) for spectral line fitting
 - [UltraNest](https://github.com/JohannesBuchner/UltraNest) for nested sampling
-- [Cloudy](https://gitlab.nublado.org/cloudy/cloudy/-/wikis/home) photoionization code
 
-Thanks to the authors of these essential packages.
+Thanks to the authors of these essential softwares and packages.
 
 ---
 
