@@ -477,10 +477,10 @@ The model comparison plot (`model_comparison.pdf`) shows:
 - Vertical colored lines: Cloud centroid velocities
 
 **Right panel**: Parameter distributions as violin plots showing:
-- Filled violins: 1σ posterior distributions
-- Dashed outlines: 3σ posterior distributions
+- Filled violins: $1\sigma$ posterior distributions
+- Dashed outlines: $3\sigma$ posterior distributions
 - Black stars: Median values
-- Parameters shown: Z, nH, NHI, T, L, b_turb
+- Parameters shown: $Z$, $n_H$, $N(\text{HI})$, $T$, $L$, $b_{nt}$
 
 Lines are automatically ordered:
 1. HI lines first, sorted by f*λ (oscillator strength × wavelength)
