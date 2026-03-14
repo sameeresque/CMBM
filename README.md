@@ -24,8 +24,8 @@
 
 ## Key Features
 
-- **Multi-phase modeling**: Fit absorption systems with multiple ionization phases simultaneously
-- **Bayesian framework**: Full posterior sampling with UltraNest nested sampling
+- **Multi-phase modeling**: Fit absorption systems with multiple ionization phases and clouds simultaneously
+- **Bayesian framework**: UltraNest nested sampling for full Bayesian inference
 - **Cloudy integration**: Uses precomputed Cloudy photoionization model grids
 - **YAML-based configuration**: Easy, reproducible setup via configuration files
 - **Comprehensive post-processing**: Automated analysis tools for parameter extraction and visualization
