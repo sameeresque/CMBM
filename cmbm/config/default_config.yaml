@@ -1,21 +1,18 @@
-# Default configuration for CMBM
+# Configuration file for CMBM
 # Cloud-by-cloud Multiphase Bayesian ionization Modeling
 
 # ==============================================================================
 # DATA PATHS - Update these paths for your data
 # ==============================================================================
-dataset_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/VP/savegoodresult3.hdf5"                          # Path to VoigtFit dataset (.hdf5)
-voigtfit_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/VP/bestfit_result3.pickle"                         # Path to VoigtFit results (.pickle)  
-mask_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/Mask/mask.pkl"                             # Path to velocity masks (.pkl)
-transition_library_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/J0943/Atomdata/atomdata_updated_new.dat"              # Path to atomic transition data file
+dataset_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/KCWI-HIRES-Catalog/J143040+014939/2.07079/VP/savegoodresult3.hdf5"                          # Path to VoigtFit dataset (.hdf5)
+voigtfit_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/KCWI-HIRES-Catalog/J143040+014939/2.07079/VP/bestfit_result3_master_a.pickle"                         # Path to VoigtFit results (.pickle)  
+mask_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/KCWI-HIRES-Catalog/J143040+014939/2.07079/Masking/mask_a.pkl"                             # Path to velocity masks (.pkl)
+transition_library_path: "/ourdisk/hpc/cgmflows/sameer/dont_archive/KCWI-HIRES-Catalog/J143040+014939/2.07079/AtomData/atomdata_updated_new.dat"              # Path to atomic transition data file
 
 # Grid paths for Cloudy models
-grid_paths:
-  gridpath: "/scratch/sameer/"       # Thin grid directory
-  gridpath_thick: "/scratch/sameer/" # Thick grid directory
-
-grid_z: "0.2"                              # Grid redshift identifier
-
+grids:
+  thin: '/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/Nipiethin.pkl'
+  thick: '/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/Nipiethick.pkl'
 # ==============================================================================
 # FITTING CONFIGURATION
 # ==============================================================================
@@ -23,35 +20,65 @@ grid_z: "0.2"                              # Grid redshift identifier
 # Phase structure - defines the physical components to fit
 # Each phase can contain multiple clouds with different ionization states
 phases:
-  Ph1: ["SiIII_0", "HI_1"]
+  Ph1: ['MgII_0']
+  Ph2: ['CIV_0', 'CIV_1']
+  Ph3: ['SiIII_0', 'SiIII_1', 'SiIII_2']
 
+alpha_params:
+  MgII_0: ['Mgalpha']
+  CIV_1:  ['Nalpha']
+  SiIII_0: ['Nalpha']
+  SiIII_1: ['Nalpha']
+
+alpha_bounds:
+  Mgalpha: [0.0, 2.0]
+  Nalpha:  [-3.0, 0.0]
+  Calpha:  [-1.0, 1.0]
+
+prior_settings:
+  z_sigma: 2        # number of sigma around VoigtFit z value
+  bturb_sigma: 2    # number of sigma for bturb upper bound
+  NHI_min: 10.0     # if not set, read from grid axes
+  NHI_max: 22.0     # if not set, read from grid axes
 
 # Spectral lines to include in the fit
-use_lines: [
-  "CII_1334", "CII_1036", "CIII_977", "FeII_1144", 
-  "HI_1215", "HI_1025", "HI_972", "HI_949", "HI_937", "HI_930", "HI_926",
-  "MgI_2852", "MgII_2796", "NII_1083", "NV_1238", "OI_1302", "OVI_1031",
-  "SII_1253", "SIII_1012", "SiII_1190", "SiIII_1206", "SiIV_1393"
+use_lines: ["HI_1215",
+"AlII_1670",
+"AlIII_1862",
+"AlIII_1854",
+"CII_1334",
+"CIV_1548",
+"CIV_1550",
+"FeII_2600",
+"MgI_2852",
+"MgII_2796",
+"MgII_2803",
+"MnII_2576",
+"NII_1083",
+"NV_1238",
+"NV_1242",
+"OI_1302",
+"SII_1253",
+"SII_1250",
+"SiII_1526",
+"SiII_1260",
+"SiIII_1206",
+"SiIV_1393",
+"SiIV_1402",
+"TiII_1910"
 ]
 
 # Available ions in Cloudy grids (used for column density interpolation)
-cloudy_ions: [
-  "MgX", "AlII", "AlIII", "SIV", "CII", "HI", "CIV", "CIII", "SII", "TiII",
-  "MgII", "NI", "OIII", "NaI", "SiII", "SiIII", "PIII", "NeVIII", "CaI", "FeI",
-  "ZnII", "MnII", "SiIV", "SiI", "PI", "MgI", "NV", "CI", "SIII", "SVI",
-  "FeII", "OIV", "CaII", "NII", "OII", "OI", "NIII", "AlI", "SI", "PII", "OV", "OVI"
-]
+cloudy_ions: ['HI','NI','NII','NIII','NIV','NV','SiI','SiII','SiIII','SiIV','OI','OII','OIII','OIV','OV','OVI','CI','CII','CIII','CIV','FeI','FeII','FeIII','SI','SII','SIII','SIV','SV','SVI','PI','PII','PIII','PIV','AlI','AlII','AlIII','MgII','MgI','CaII','MnII','ZnII','TiII','CaI','NaI','NeVIII','MgX']
 # ==============================================================================
 # MASKING CONFIGURATION
 # ==============================================================================
 
 masks:
   velocity_limits:
-    lowlim: -160
-    uplim: 190
-    maxvel: 500
-  custom_masks:
-    CIII_977: [[-500, 5], [190, 500]]
+    lowlim: -220
+    uplim: -77
+    maxvel: 400
 
 # ==============================================================================
 # NESTED SAMPLING PARAMETERS
@@ -59,19 +86,19 @@ masks:
 
 # Basic sampling settings
 min_num_live_points: 400                    # Number of live points
-dlogz: 0.5                                  # Target evidence accuracy (will be adjusted by ndim)
-min_ess: 400                                # Minimum effective sample size
-nsteps_factor: 2                            # Step sampler steps = nsteps_factor * ndim
+dlogz: 50                                  # Target evidence accuracy (will be adjusted by ndim)
+min_ess: 50                                # Minimum effective sample size
+nsteps_factor: 1                            # Step sampler steps = nsteps_factor * ndim
 
 # Advanced sampling settings
-update_interval_volume_fraction: 0.2        # Volume update interval
+update_interval_volume_fraction: 0.5        # Volume update interval
 max_num_improvement_loops: -1               # Maximum improvement loops (-1 = no limit)
 
 # ==============================================================================
 # OUTPUT SETTINGS
 # ==============================================================================
 
-output_dir: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/SiIII0HI1"                  # Output directory name
+output_dir: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/MgII0CIV01SiIII012"                  # Output directory name
 resume: true                                # Resume previous run if available
 
 # ==============================================================================
@@ -83,7 +110,7 @@ resume: true                                # Resume previous run if available
 
 # Galaxy redshift for velocity reference in plots
 # If not specified (null), z_sys will be used
-zgal: 0.2284
+zgal: 2.07079
 # Example: zgal: 0.2284
 
 
@@ -93,21 +120,50 @@ zgal: 0.2284
 
 plotting:
   # Velocity range for plots [vmin, vmax] in km/s
-  velocity_range: [-30, 390]
+  velocity_range: [-290, -10]
   # Lines to exclude from model comparison plot
-  deactivate_lines: ['CI_945','CI_1328','NI_1199','SIV_1062',
- 'CaII_3969',
+  deactivate_lines: [ 'CI_1560',
  'FeIII_1122',
- 'FeII_1063',
- 'FeII_1096',
+ 'FeIII_1214',
+ 'FeII_1121',
  'FeII_1143',
+ 'FeII_1144',
+ 'FeII_1608',
+ 'FeII_2260',
+ 'FeII_2344',
+ 'FeII_2374',
+ 'FeII_2382',
  'FeII_2586',
+ 'FeI_2463',
+ 'FeI_2484',
+ 'FeI_2501',
+ 'FeI_2719',
+ 'FeI_2967',
+ 'FeI_3021',
+ 'MgI_2026',
+ 'MnII_2594',
+ 'MnII_2606',
+ 'NI_1134a',
+ 'NI_1134b',
+ 'NI_1134c',
+ 'NI_1200',
  'NI_1201',
- 'OI_1039',
+ 'NaI_2853',
+ 'OI_1355',
+ 'SIII_1190',
  'SII_1259',
  'SI_1295',
- 'SVI_944',
- 'SiII_1020']
+ 'SI_1473',
+ 'SiII_1190',
+ 'SiII_1808',
+ 'SiI_1631',
+ 'SiI_1693',
+ 'SiI_1845',
+ 'SiI_2515',
+ 'TiIII_1295',
+ 'TiIII_1298',
+ 'TiII_3067',
+ 'TiII_3073']
 
   
   # Lines to show as fully masked (grayed out)
@@ -120,10 +176,12 @@ plotting:
 # ==============================================================================
 
 slurm:
-  job_name: "SiIII0HI1"           # Job name (-J flag)
-  partition: "sooner_test"       # Partition name (--partition)
+  job_name: "MgII0CIV01SiIII012"           # Job name (-J flag)
+  partition: "sooner_test_32gb_20core"       # Partition name (--partition)
   container: "el9hw"             # Container image (--container)
-  nodes: 1                       # Number of nodes (--nodes)
-  ntasks_per_node: 8             # MPI tasks per node (--ntasks-per-node)
-  mem_per_cpu: "16G"             # Memory per CPU (--mem-per-cpu)
-  time: "04:00:00"               # Wall time (--time, HH:MM:SS)
+  chdir: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/"
+  nodes: 5                       # Number of nodes (--nodes)
+  ntasks_per_node: 20             # MPI tasks per node (--ntasks-per-node)
+  mem: "28G"             # Memory per CPU (--mem-per-cpu)
+  time: "06:00:00"               # Wall time (--time, HH:MM:SS)
+  output: "/ourdisk/hpc/cgmflows/sameer/dont_archive/testing/MgII0CIV01SiIII012/"

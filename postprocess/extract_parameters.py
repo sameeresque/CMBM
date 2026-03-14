@@ -31,6 +31,12 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import cmbm
 
+ALPHA_ELEMENT_MAP = {
+    'Mgalpha': 'Mg',
+    'Nalpha':  'N',
+    'Calpha':  'C',
+}
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Analyze CMBM results')
     parser.add_argument('--config', required=True, help='Config file used for fitting')
@@ -149,7 +155,8 @@ def compute_derived_quantities(post, fitter, n_processes=12):
     """Compute derived quantities using multiprocessing."""
     phases = fitter.config['phases']
     interest_ions = list(set([line.split('_')[0] for line in fitter.config['use_lines']]))
-    interest_ions = [ion for ion in interest_ions if ion in fitter.config['cloudy_ions']]
+    interest_ions = [ion for ion in interest_ions if ion in fitter.grids['Nipiethin']]
+
     
     # Flatten phases to get list of clouds
     clouds = []
@@ -185,11 +192,30 @@ def compute_derived_quantities(post, fitter, n_processes=12):
             NH_args = [(Z, nH, NHI, fitter.grids) for Z, nH, NHI in zip(*pie_grid)]
             post[f'{cloud}_NH'] = pool.starmap(process_pie_NH, NH_args)
             
-            # Compute ion column densities
+
+            # Replace with:
+            alpha_params = fitter.config.get('alpha_params', {})
+            cloud_alphas = alpha_params.get(cloud, [])
+
             for ion in interest_ions:
                 ion_args = [(Z, nH, NHI, ion, fitter.grids) for Z, nH, NHI in zip(*pie_grid)]
-                post[f'{cloud}_{ion}'] = pool.starmap(process_pie_ion, ion_args)
-            
+                raw_N = pool.starmap(process_pie_ion, ion_args)
+
+                # Apply alpha offset if this cloud has one for this element
+                elem = fitter._speciesname(ion)[0]
+                alpha_col = None
+                for alpha_name in cloud_alphas:
+                    if ALPHA_ELEMENT_MAP.get(alpha_name) == elem:
+                        alpha_col = f'{cloud}_{alpha_name}'
+                        break
+
+                if alpha_col is not None and alpha_col in post.columns:
+                    post[f'{cloud}_{ion}'] = np.array(raw_N) + post[alpha_col].values
+                else:
+                    post[f'{cloud}_{ion}'] = raw_N
+
+
+
             # Compute velocity relative to zgal from config (or z_sys if not specified)
             V_args = [(zgal, z) for z in post[f'{cloud}_z']]
             post[f'{cloud}_V'] = pool.starmap(findV, V_args)
@@ -270,7 +296,8 @@ def compute_statistics(post, weights, fitter):
         clouds.extend(components)
     
     interest_ions = list(set([line.split('_')[0] for line in fitter.config['use_lines']]))
-    interest_ions = [ion for ion in interest_ions if ion in fitter.config['cloudy_ions']]
+    interest_ions = [ion for ion in interest_ions if ion in fitter.grids['Nipiethin']]
+
     
     print("  Computing quantile statistics...")
     
@@ -279,9 +306,16 @@ def compute_statistics(post, weights, fitter):
     
     # Structure: pars[cloud][param][sigma] = (median, -err, +err)
     pars_basic = OrderedDict()
+    alpha_params = fitter.config.get('alpha_params', {})
     for cloud in clouds:
         pars_basic[cloud] = OrderedDict()
-        for param in ['z', 'V', 'Z', 'nH', 'T', 'NHI', 'NH', 'L', 'bturb', 'btherm_HI', 'bnet_HI']:
+
+        
+        cloud_alphas = alpha_params.get(cloud, [])
+        base_params = ['z', 'V', 'Z', 'nH', 'T', 'NHI', 'NH', 'L', 'bturb', 'btherm_HI', 'bnet_HI']
+        all_params = base_params + cloud_alphas
+
+        for param in all_params:
             pars_basic[cloud][param] = OrderedDict()
             for sigma in [1, 2, 3]:
                 ql, qm, qh = _quantile(
@@ -381,8 +415,10 @@ def make_corner_plots(post, weights, fitter, save_dir):
         print(f"    Creating corner plot for {cloud}...")
         
         # Select columns for this cloud
+        alpha_params = fitter.config.get('alpha_params', {})
+        alpha_cols = [f'{cloud}_{a}' for a in alpha_params.get(cloud, [])]
         cols = [f'{cloud}_Z', f'{cloud}_nH', f'{cloud}_NHI', f'{cloud}_bturb', 
-                f'{cloud}_T', f'{cloud}_L', f'{cloud}_NH', f'{cloud}_z']
+                f'{cloud}_T', f'{cloud}_L', f'{cloud}_NH', f'{cloud}_z'] + alpha_cols
         
         # Filter to existing columns
         cols = [c for c in cols if c in post.columns]
@@ -537,9 +573,12 @@ def generate_model_profiles(pars_basic, fitter):
     clouds = []
     for phase_name, components in phases.items():
         clouds.extend(components)
+
+    alpha_params = fitter.config.get('alpha_params', {})  # add this line
     
     interest_ions = list(set([line.split('_')[0] for line in fitter.config['use_lines']]))
-    interest_ions = [ion for ion in interest_ions if ion in fitter.config['cloudy_ions']]
+    interest_ions = [ion for ion in interest_ions if ion in fitter.grids['Nipiethin']]
+
     
     # Build info dict for each cloud using median values
     infos = {}
@@ -560,10 +599,19 @@ def generate_model_profiles(pars_basic, fitter):
             mass = fitter.species[ion][list(fitter.species[ion].keys())[0]][2]
             
             # Get column density
+
             if NHI_med <= 16.0:
                 N = fitter.grids['Nipiethin'][ion]([Z_med, nH_med])[0] + (NHI_med - 14.0)
             else:
                 N = fitter.grids['Nipiethick'][ion]([Z_med, nH_med, NHI_med])[0]
+
+            # Apply alpha offset at median value
+            elem = fitter._speciesname(ion)[0]
+            for alpha_name in alpha_params.get(cloud, []):
+                if ALPHA_ELEMENT_MAP.get(alpha_name) == elem:
+                    alpha_med = pars_basic[cloud][alpha_name][1][0]  # median from 1-sigma
+                    N += alpha_med
+                    break
             
             # Compute b-value
             b = np.sqrt(bturb_med**2 + btherm(T_med, mass)**2)
@@ -719,7 +767,8 @@ def plot_model_comparison(model_profile, model_profile_comb, infos, clouds, post
         return result
     
     interest_ions = list(set([line.split('_')[0] for line in fitter.config['use_lines']]))
-    interest_ions = [ion for ion in interest_ions if ion in fitter.config['cloudy_ions']]
+    interest_ions = [ion for ion in interest_ions if ion in fitter.grids['Nipiethin']]
+
     
     z_sys = fitter.dataset.redshift
     
@@ -808,95 +857,114 @@ def plot_model_comparison(model_profile, model_profile_comb, infos, clouds, post
     
     fig = plt.figure(figsize=(fig_width, fig_height))
     gs = gridspec.GridSpec(rows, n_cols_total)
-    gs.update(wspace=0.0, hspace=0.0)
+    gs.update(wspace=0.02, hspace=0.0)
+
     k = 0
     l = 0
     
+    # First pass: figure out which (row, col) positions will be filled
+    positions = []
+    _k, _l = 0, 0
+    for _ in lines_to_plot:
+        positions.append((_k, _l))
+        _k += 1
+        if _k == rows:
+            _k = 0
+            _l += 1
+    
+    # For each column, find the last row that has a panel
+    last_row_in_col = {}
+    for (row, col) in positions:
+        last_row_in_col[col] = max(last_row_in_col.get(col, 0), row)
+    
     # Plot absorption lines in sorted order
     ax0 = None
-    for ion, trans, line_id in lines_to_plot:
+    for idx, (ion, trans, line_id) in enumerate(lines_to_plot):
+        row, col = positions[idx]
+    
         # Create subplot
-        if k == 0 and l == 0:
-            ax = fig.add_subplot(gs[k, l])
+        if row == 0 and col == 0:
+            ax = fig.add_subplot(gs[row, col])
             ax0 = ax
         else:
-            ax = fig.add_subplot(gs[k, l], sharex=ax0, sharey=ax0)
-        
-        # Hide labels appropriately
-        if l != 0:
+            ax = fig.add_subplot(gs[row, col], sharex=ax0, sharey=ax0)
+    
+        # Hide y-tick labels for all but leftmost column
+        if col != 0:
             plt.setp(ax.get_yticklabels(), visible=False)
-        if k != rows-1:  # Not in last row
-            if l != n_cols_lines-1 or k < rows//2:  # Not in last column or upper half
-                plt.setp(ax.get_xticklabels(), visible=False)
-        
+    
+        # Hide x-tick labels unless this is the last panel in its column
+        if row != last_row_in_col[col]:
+            plt.setp(ax.get_xticklabels(), visible=False)
+    
         # Plot individual cloud models
         for numb, i in enumerate(infos):
             vel, flux, velcen, tau = model_profile[i][ion][trans]
-            ax.plot(vel + findV(zgal, z_sys), flux, 
-                   color=colora[i], label=f'{numb}', 
+            ax.plot(vel + findV(zgal, z_sys), flux,
+                   color=colora[i], label=f'{numb}',
                    linewidth=1.5, linestyle='-', zorder=1)
             for m in velcen:
                 ax.axvline(x=m + findV(zgal, z_sys), ymin=0.8, ymax=0.95,
                           color=colora[i], linewidth=1.5, linestyle='-')
-        
+    
         # Plot combined model
         try:
             vel_comb, flux_comb = model_profile_comb[ion][trans]
-            ax.plot(vel_comb + findV(zgal, z_sys), flux_comb, 
+            ax.plot(vel_comb + findV(zgal, z_sys), flux_comb,
                    'black', linewidth=1.75, linestyle='-', zorder=3)
         except:
             print(f"  {line_id}: no combined model")
-        
+    
         # Annotate
-        ax.annotate(f'{ion} {trans}', xy=(0.03, 0.10), 
+        ax.annotate(f'{ion} {trans}', xy=(0.03, 0.10),
                    xycoords='axes fraction', color='navy', fontsize=14)
-        
+    
         # Plot data
         try:
             line_data = fitter.dataset.find_line(line_id)[0]
             vel_data = vel_comb + findV(zgal, z_sys)
-            
+    
             ax.errorbar(vel_data, line_data.flux, yerr=line_data.err,
                        color='gray', fmt='.', ls='none')
-            
+    
             mask_data = line_data.mask
             if line_id not in masked:
                 ax.fill_between(vel_data, 0, 1, where=(mask_data == 0),
                                facecolor='grey', alpha=0.5)
             else:
-                ax.fill_between(vel_data, 0, 1, 
+                ax.fill_between(vel_data, 0, 1,
                                facecolor='grey', alpha=0.5)
         except:
             print(f"  {line_id}: no data")
-        
+    
         # Formatting - use velocity range from config
         ax.set_xlim([vmin, vmax])
         ax.set_ylim([-0.1, 1.3])
-        ax.tick_params(axis='both', direction='in', which='major', 
+        ax.tick_params(axis='both', direction='in', which='major',
                       length=10, width=2, labelsize=16)
         ax.tick_params(axis='both', direction='in', which='minor',
                       length=5, width=1, labelsize=16)
         ax.yaxis.set_major_locator(MultipleLocator(0.5))
         ax.yaxis.set_minor_locator(MultipleLocator(0.1))
-        
+    
         # Dynamic tick spacing based on velocity range
         vel_span = vmax - vmin
         if vel_span <= 100:
-            major_tick = 20
-            minor_tick = 5
+            major_tick = 25
+            minor_tick = 4
         elif vel_span <= 300:
-            major_tick = 50
-            minor_tick = 10
-        elif vel_span <= 600:
             major_tick = 100
-            minor_tick = 25
-        else:
-            major_tick = 150
             minor_tick = 50
-        
+        elif vel_span <= 600:
+            major_tick = 200
+            minor_tick = 50
+        else:
+            major_tick = 200
+            minor_tick = 50
+    
         ax.xaxis.set_major_locator(MultipleLocator(major_tick))
         ax.xaxis.set_minor_locator(MultipleLocator(minor_tick))
-        
+    
         k = k + 1
         if k == rows:
             k = 0
@@ -921,7 +989,7 @@ def plot_model_comparison(model_profile, model_profile_comb, infos, clouds, post
                         length=10, width=2, labelsize=16)
         axis.tick_params(axis='both', direction='in', which='minor',
                         length=5, width=1, labelsize=16)
-        
+        axis.minorticks_on()        
         # Use same dynamic tick spacing
         axis.xaxis.set_major_locator(MultipleLocator(major_tick))
         axis.xaxis.set_minor_locator(MultipleLocator(minor_tick))

@@ -81,11 +81,9 @@ mask_path: "path/to/your/masks.pkl"                             # Path to veloci
 transition_library_path: "path/to/atomdata.dat"              # Path to atomic transition data file
 
 # Grid paths for Cloudy models
-grid_paths:
-  gridpath: "/path/to/cloudy/grids/"       # Thin grid directory
-  gridpath_thick: "/path/to/cloudy/grids/" # Thick grid directory
-
-grid_z: "0.2"                              # Grid redshift identifier
+grids:
+  thin: 'path/to/your/Nipiethin.pkl'
+  thick: 'path/to/your/Nipiethick.pkl'
 
 # ==============================================================================
 # FITTING CONFIGURATION
@@ -96,8 +94,23 @@ grid_z: "0.2"                              # Grid redshift identifier
 phases:
   Ph1: ["SiIII_0", "HI_1"]
 
+#optional
+alpha_params:
+  SiIII_0: ['Calpha'] # if the cloud traced by SiIII_0 is considered to be presenting abundance pattern variations
+  
+#optional
+alpha_bounds:
+  Mgalpha: [0.0, 2.0]
+  Nalpha:  [-3.0, 0.0]
+  Calpha:  [-1.0, 1.0]
 
-# Spectral lines to include in the fit
+prior_settings:
+  z_sigma: 3        # number of sigma around VoigtFit z value
+  bturb_sigma: 3    # number of sigma for bturb upper bound
+  NHI_min: 10.0     # if not set, read from grid axes
+  NHI_max: 22.0     # if not set, read from grid axes
+
+# Spectral lines to include in the optimization
 use_lines: [
   "CII_1334", "CII_1036", "CIII_977", "FeII_1144", 
   "HI_1215", "HI_1025", "HI_972", "HI_949", "HI_937", "HI_930", "HI_926",
@@ -105,13 +118,6 @@ use_lines: [
   "SII_1253", "SIII_1012", "SiII_1190", "SiIII_1206", "SiIV_1393"
 ]
 
-# Available ions in Cloudy grids (used for column density interpolation)
-cloudy_ions: [
-  "MgX", "AlII", "AlIII", "SIV", "CII", "HI", "CIV", "CIII", "SII", "TiII",
-  "MgII", "NI", "OIII", "NaI", "SiII", "SiIII", "PIII", "NeVIII", "CaI", "FeI",
-  "ZnII", "MnII", "SiIV", "SiI", "PI", "MgI", "NV", "CI", "SIII", "SVI",
-  "FeII", "OIV", "CaII", "NII", "OII", "OI", "NIII", "AlI", "SI", "PII", "OV", "OVI"
-]
 # ==============================================================================
 # MASKING CONFIGURATION
 # ==============================================================================
@@ -155,7 +161,6 @@ resume: true                                # Resume previous run if available
 # Galaxy redshift for velocity reference in plots
 # If not specified (null), z_sys will be used
 zgal: 0.2284
-# Example: zgal: 0.2284
 
 
 # ==============================================================================
@@ -192,12 +197,14 @@ plotting:
 
 slurm:
   job_name: "SiIII0HI1"           # Job name (-J flag)
-  partition: "sooner_test"       # Partition name (--partition)
+  partition: "sooner_test_32gb_20core"       # Partition name (--partition)
   container: "el9hw"             # Container image (--container)
-  nodes: 1                       # Number of nodes (--nodes)
-  ntasks_per_node: 8             # MPI tasks per node (--ntasks-per-node)
-  mem_per_cpu: "16G"             # Memory per CPU (--mem-per-cpu)
-  time: "04:00:00"               # Wall time (--time, HH:MM:SS)
+  chdir: "path/to/your/"
+  nodes: 5                       # Number of nodes (--nodes)
+  ntasks_per_node: 20             # MPI tasks per node (--ntasks-per-node)
+  mem: "28G"             # total Memory( optionally can also supply --mem-per-cpu)
+  time: "06:00:00"               # Wall time (--time, HH:MM:SS)
+  output: "path/to/your/SiIII0HI1/"
 ```
 
 ### 2. Run the Fit
@@ -222,15 +229,15 @@ See [Post-processing and Analysis](#post-processing-and-analysis) section below.
 
 CMBM implements a **cloud-by-cloud multiphase approach** to modeling absorption line systems:
 
-1. **Phase Definition**: Define distinct ionization phases
-2. **Cloud Components**: Each phase can contain multiple velocity components
+1. **Phase Definition**: Define distinct ionization phases, e.g., a low ionization phase comprising traced by lower ionization species and a higher ionization phase traced by intermediate/higher ionization species. 
+2. **Cloud Components**: Each phase can contain multiple velocity components.
 3. **Physical Parameters**: Each cloud has 5 physical parameters (for the assumption of photoionization equilibrium and solar abundance pattern):
    - **Z**: Metallicity (relative to solar)
    - **nH**: Hydrogen density (cm⁻³)
    - **NHI**: Neutral hydrogen column density (cm⁻²)
    - **b_turb**: Turbulent broadening (km/s)
    - **z**: Redshift
-
+   - **Mgalpha/Calpha/Nalpha**: Abundance variations (optional parameter)
 4. **Cloudy Models**: Column densities computed from precomputed Cloudy photoionization grids
 5. **Bayesian Fitting**: UltraNest nested sampling provides full posterior distributions
 6. **Model Comparison**: Bayesian evidence enables robust model comparison
@@ -243,6 +250,7 @@ From the 5 fitted parameters, CMBM computes:
 - **Total hydrogen column** (NH): From Cloudy models
 - **Velocity**: Relative to galaxy redshift
 - **Ion-specific b-parameters**: Including thermal broadening
+- **Abundance patterns**: Abundance variations relative to solar abundance
 
 ### Bayesian Framework
 
@@ -256,7 +264,6 @@ The relationship between data and model:
 ```
 d_i = f_i(θ) + ε_i,    ε_i ~ N(0, σ_i²)
 ```
-
 where ε_i represents Gaussian measurement uncertainties with standard deviation σ_i.
 
 #### Likelihood Function
@@ -285,17 +292,10 @@ The posterior distribution combines prior knowledge with observational constrain
 #### Parameter Inference
 
 This is accomplished using UltraNest, which efficiently:
-- Handle multimodal posterior distributions
-- Compute the Bayesian evidence (log Z)
+- Handles multimodal posterior distributions
+- Compute the Bayesian evidence (log Z) for model comparison
 - Generate posterior samples for parameter estimation
 - Provide robust uncertainty quantification
-
-#### Advantages of Bayesian Approach
-
-- **Full uncertainty propagation**: Posterior distributions capture parameter degeneracies and correlations
-- **Model comparison**: Bayesian evidence enables rigorous comparison of different phase structures
-- **Physical constraints**: Prior distributions incorporate known physical bounds (e.g., density ranges, metallicity limits)
-- **Multimodal solutions**: Nested sampling naturally handles multiple parameter solutions
 
 ## Requirements
 
@@ -314,65 +314,95 @@ This is accomplished using UltraNest, which efficiently:
 CMBM requires several input files:
 
 1. **VoigtFit Dataset** (`.hdf5`): Observed spectra prepared with VoigtFit
-   - Contains wavelength, flux, error arrays for each absorption line
+   - Contains wavelength, continuum normalized flux, error arrays for each absorption line. It also contains the information pertaining to the line spread function.
    - Created using VoigtFit's `dataset.save()` method
 
 2. **VoigtFit Results** (`.pickle`): Initial parameter estimates from VoigtFit
-   - Provides starting guesses for cloud redshifts and velocities
+   - Provides informed priors for cloud redshifts and Doppler parameters
    - Created by VoigtFit's fitting procedure
 
-3. **Velocity Masks** (`.pkl`): Velocity regions to include/exclude in fits
+3. **Velocity Masks** (`.pkl`): Velocity regions to exclude in fits
    - Dictionary specifying masked velocity ranges per line
    - Can be created with custom scripts or VoigtFit utilities
+   - For ions with multiple transitions, the apparent optical depth (AOD) technique (Savage & Sembach 1991)
+     can be used to identify blends and contamination by comparing the apparent 
+     column density profiles across transitions of same species. Regions where profiles disagree 
+     could indicate contamination/saturation.
+   - For ions with a single transition, a full identification of all spectral features 
+     is encouraged to ensure the absorption is real and not a misidentification of an unrelated feature.
 
 4. **Cloudy Grids**: Precomputed photoionization model grids
-   - Must match `grid_z` parameter in config
+   - Two separate ionization grids each corresponding to optically thin and optically thick regimes are recommended. These are to be supplied as pre-built interpolant dictionaries and specified in the config file. Each pkl file is a dictionary mapping ion names (e.g. `'CII'`, `'MgII'`) plus 
+   `'logNHtot'` and `'logT'` to `RegularGridInterpolator` objects. The column densities are in log units.
 
-5. **Atomic Data** (`.dat`): Transition wavelengths, oscillator strengths, damping constants
+   The predicted ion column densities scale with metallicity and relative abundance as:
+
+   log N_{k,j} = log N^(m)_{k,j} + ΔZ + Δ[X_k/H]
+
+   where ΔZ is the logarithmic offset in metallicity and Δ[X_k/H] is the logarithmic 
+   scaled abundance of ion k relative to the model grid value. For optically thin clouds 
+   (log N_HI < 16), an additional scaling with neutral hydrogen 
+   column density applies:
+
+   log N_{k,j} = log N^(m)_{k,j} + Δ(N_HI) + ΔZ + Δ[X_k/H]
+
+   where Δ(N_HI) = log N_HI − log N^(m)_HI. This scaling means that in the optically 
+   thin regime a single representative model cloud can be scaled rather than building 
+   a full grid, saving substantial compute time. These scaling laws also imply 
+   degeneracies: for all clouds there is a degeneracy between N_{k,j} and Z/Z_sun 
+   (and [X_k/H] for ion k), while for optically thin clouds there is an additional 
+   degeneracy between N_{k,j} and N_HI.
+
+   Per-cloud abundance offsets for individual elements (e.g. Mg, N, C) can be 
+   specified via the `alpha_params` config block.
+
+   For more information, the user is encouraged to refer to the Chapter 35 of textbook Quasar Absorption Lines Volume 2 - Astrophysics, Analysis and Modeling by Christopher Churchill.
+
+6. **Atomic Data** (`.dat`): Transition wavelengths, oscillator strengths, damping constants
    - Standard format atomic line database
 
 ## Running Fits
 
-### Interactive Python Session
+### Python script to submit job to a HPC with SLURM scheduler
 ```python
 import cmbm
+import subprocess
+import os
 
-fitter = cmbm.CMBMFitter('my_config.yaml')
+pathtoconfig = '/pathtoconfig/my_config.yaml'
+fitter = cmbm.CMBMFitter(pathtoconfig)
 fitter.load_data()
-results = fitter.run_fit()
-```
 
-### Command Line
-```bash
-python -c "import cmbm; f = cmbm.CMBMFitter('my_config.yaml'); f.load_data(); f.run_fit()"
-```
+# Get SLURM settings
+slurm = fitter.config['slurm']
 
-### SLURM Batch Script
-```bash
-#!/bin/bash
-#SBATCH --job-name=cmbm_fit
-#SBATCH --partition=normal
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --mem-per-cpu=16G
-#SBATCH --time=04:00:00
-
+# Create batch script with values embedded
+batch_script = f"""#!/bin/bash
+#SBATCH -J {slurm['job_name']}
+#SBATCH --partition={slurm['partition']}
+#SBATCH --container={slurm.get('container', 'el9hw')}
+#SBATCH --chdir={slurm['chdir']}
+#SBATCH --nodes={slurm['nodes']}
+#SBATCH --ntasks-per-node={slurm['ntasks_per_node']}
+#SBATCH --mem={slurm['mem']}
+#SBATCH --time={slurm['time']}
+#SBATCH --output={fitter.config['output_dir']}/cmbm_%j.out
+date
+export OMP_NUM_THREADS=1
+export UCX_TLS=all
 module load Python/3.11.3-GCCcore-12.3.0
-module load OpenMPI/4.1.4-GCC-12.2.0
+module load impi/2021.9.0-intel-compilers-2023.1.0
+source /pathtovirtualenv/cmbm_env/bin/activate
+mpiexec -np {slurm['nodes']*slurm['ntasks_per_node']} python /pathtoyour/runfit.py --config {pathtoconfig}
+date
+"""
 
-cd /path/to/your/work/directory
+# Write and submit
+with open('SubmissionScript.sh', 'w') as f:
+    f.write(batch_script)
 
-python << EOF
-import cmbm
-fitter = cmbm.CMBMFitter('my_config.yaml')
-fitter.load_data()
-fitter.run_fit()
-EOF
-```
-
-### Parallel Execution with MPI
-```bash
-mpiexec -n 8 python -c "import cmbm; f = cmbm.CMBMFitter('my_config.yaml'); f.load_data(); f.run_fit()"
+os.chmod('SubmissionScript.sh', 0o755)
+subprocess.call('sbatch SubmissionScript.sh', shell=True)
 ```
 
 ## Output
@@ -416,7 +446,7 @@ After fitting, analyze your results with the post-processing tool:
 
 ### Basic Usage
 ```bash
-python postprocess/analyze_results.py \
+python postprocess/extract_parameters.py \
     --config my_config.yaml \
     --output_dir my_results \
     --save_dir analysis_output \
@@ -525,10 +555,16 @@ CMBM is released under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
+The development of this package benefited greatly from discussions with my PhD advisor, 
+Jane Charlton, and collaborators Chris Churchill, Glenn Kacprzak, Nicolas Lehner, 
+J. Christopher Howk, Nikole Nielsen, Bart Wakker, and several others.
+
 CMBM builds upon:
 - [VoigtFit](https://github.com/jkrogager/VoigtFit) for spectral line fitting
 - [UltraNest](https://github.com/JohannesBuchner/UltraNest) for nested sampling
 - [Cloudy](https://gitlab.nublado.org/cloudy/cloudy/-/wikis/home) photoionization code
+
+Thanks to the authors of these essential packages.
 
 ---
 

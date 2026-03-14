@@ -35,6 +35,13 @@ import mpi4py
 import yaml
 from pathlib import Path
 
+ALPHA_ELEMENT_MAP = {
+    'Mgalpha': 'Mg',
+    'Nalpha':  'N',
+    'Calpha':  'C',
+}
+
+
 # Skip warnings when we add the -np.inf log likelihood value
 np.seterr(invalid='ignore')
 
@@ -139,6 +146,7 @@ class CMBMFitter:
     
     def load_data(self):
         """Load all required data files."""
+        self._load_grids()
         print("Loading data files...")
         
         # Load dataset
@@ -159,7 +167,9 @@ class CMBMFitter:
         transition_library = np.asarray(transition_library)
         
         all_ions = [i.split('_')[0] for i in self.dataset.all_lines]
-        interest_ions = list(set(all_ions) & set(self.config['cloudy_ions']))
+        interest_ions = list(set(all_ions))
+        interest_ions = [ion for ion in interest_ions if ion in self.grids['Nipiethin']]
+
         self.species = self._create_species_dict(interest_ions, transition_library)
         print(f"Loaded species data for {len(interest_ions)} ions")
         
@@ -201,7 +211,7 @@ class CMBMFitter:
                 line_obj.err = df['A'].values
     
     def _create_species_dict(self, plot_ions, transition_library, choose=None):
-        """Create species dictionary (from your original speciesinterest function)."""
+        """Create species dictionary"""
         species = {}
         strongest_trans = OrderedDict()
         second_trans = OrderedDict()
@@ -248,81 +258,18 @@ class CMBMFitter:
         return species
     
     def _load_grids(self):
-        """Load Cloudy photoionization grids."""
-        grid_z = self.config['grid_z']
-        gridpath = self.config['grid_paths']['gridpath']
-        gridpath_thick = self.config['grid_paths']['gridpath_thick']
-        
-        # Load thin grid
-        pathtogrid = f'{gridpath}df_piethin/'
-        pkl = f'dfpiethin_{grid_z}.pkl'
-        df_pie = pd.read_pickle(pathtogrid + pkl)
-        df_pie = df_pie[
-            (abs(df_pie['logNHI'] - 14.0) < 0.05) & 
-            (df_pie['Temperature'] <= 3162277.6601683795)
-        ]
-        df_pie = df_pie.replace(to_replace='None', value=np.nan).dropna()
-        df_pie = df_pie[df_pie['convg'].notna() | df_pie['logNHI'].notna()]
-        df_pie = df_pie.reset_index(drop=True)
-        df_pie = df_pie[['METALS', 'HDEN', 'Temperature', 'logNHtot', 'logNHI', 'Nx']]
-        df_pie_all = df_pie.reset_index(drop=True)
-        
-        df_infofile = df_pie_all.copy()
-        df_infofile['METALS'] = df_infofile['METALS'].apply(lambda x: round(x, 2))
-        df_infofile['HDEN'] = df_infofile['HDEN'].apply(lambda x: round(x, 2))
-        
-        Z = np.sort(list(set(np.asarray(df_infofile['METALS']))))
-        Hden = np.sort(list(set(np.asarray(df_infofile['HDEN']))))
-        
-        Nipiethin = {}
-        for ion in self.config['cloudy_ions'] + ['logNHtot', 'logT']:
-            grid_file = pathtogrid + f'{pkl}_coldens_{ion}'
-            if os.path.exists(grid_file):
-                Nipiethin[ion] = RegularGridInterpolator(
-                    (Z, Hden), pd.read_pickle(grid_file)
-                )
-        
-        # Load thick grid
-        pathtogrid = f'{gridpath_thick}df_piethick/'
-        pkl = f'df_pie_thick_{grid_z}.pkl'
-        df_pie = pd.read_pickle(pathtogrid + pkl)
-        df_pie = df_pie[
-            (abs(df_pie['logNHI'] - df_pie['STOPNEUT']) < 0.05) & 
-            (df_pie['Temperature'] <= 3162277.6601683795) & 
-            (df_pie['Temperature'] >= 1.0e2)
-        ]
-        df_pie = df_pie.replace(to_replace='None', value=np.nan).dropna()
-        df_pie = df_pie[df_pie['convg'].notna() | df_pie['logNHI'].notna()]
-        df_pie = df_pie.reset_index(drop=True)
-        df_pie = df_pie[['METALS', 'HDEN', 'STOPNEUT', 'Temperature', 'logNHtot', 'logNHI', 'Nx']]
-        df_pie_all = df_pie.reset_index(drop=True)
-        
-        df_infofile = df_pie_all.copy()
-        df_infofile['METALS'] = df_infofile['METALS'].apply(lambda x: round(x, 2))
-        df_infofile['HDEN'] = df_infofile['HDEN'].apply(lambda x: round(x, 2))
-        df_infofile['STOPNEUT'] = df_infofile['STOPNEUT'].apply(lambda x: round(x, 2))
-        
-        Z = np.sort(list(set(np.asarray(df_infofile['METALS']))))
-        Hden = np.sort(list(set(np.asarray(df_infofile['HDEN']))))
-        NHI = np.sort(list(set(np.asarray(df_infofile['STOPNEUT']))))
-        
-        Nipiethick = {}
-        for ion in self.config['cloudy_ions'] + ['logNHtot', 'logT']:
-            grid_file = pathtogrid + f'{pkl}_coldens_{ion}'
-            if os.path.exists(grid_file):
-                Nipiethick[ion] = RegularGridInterpolator(
-                    (Z, Hden, NHI), pd.read_pickle(grid_file)
-                )
+        with open(self.config['grids']['thin'], 'rb') as f:
+            Nipiethin = pickle.load(f)
+        with open(self.config['grids']['thick'], 'rb') as f:
+            Nipiethick = pickle.load(f)
         
         self.grids = {
-            'df_pie': df_pie_all,
-            'Nipiethin': Nipiethin,
-            'Nipiethick': Nipiethick
+            'Nipiethin':  Nipiethin,
+            'Nipiethick': Nipiethick,
         }
     
     def _update_velocity_masks(self, mask_dict, lowlim=-160, uplim=190, maxvel=500):
-        """Update velocity masks (from your original function)."""
-        """Update velocity masks using limits from config."""
+        """Update velocity masks"""
         # Get velocity limits from config
         vel_limits = self.config.get('masks', {}).get('velocity_limits', {})
         lowlim = vel_limits.get('lowlim', -160)
@@ -382,7 +329,7 @@ class CMBMFitter:
     def _apply_masks(self):
         """Apply masks to dataset."""
         interest_ions = list(set([line.split('_')[0] for line in self.config['use_lines']]))
-        
+        interest_ions = [ion for ion in interest_ions if ion in self.grids['Nipiethin']]
         # First mask all lines
         for ion in interest_ions:
             if ion not in self.species:
@@ -390,7 +337,7 @@ class CMBMFitter:
             for trans in self.species[ion]:
                 line_id = f'{ion}_{trans}'
                 if line_id in self.dataset.all_lines:
-                    self.dataset.find_line(line_id)[0].mask[:] = True
+                    self.dataset.find_line(line_id)[-1].mask[:] = True
         
         # Then unmask specified regions
         for line, regions in self.masks.items():
@@ -409,17 +356,29 @@ class CMBMFitter:
                         line_obj.mask[loc] = False
     
     def _getVel(self, wave, l0, zabs):
-        """Calculate velocity (from your original function)."""
+        """Calculate velocity"""
         wave_center = l0 * (zabs + 1.)
         vel = const.c.cgs.value * 1e-5 * (wave - wave_center) / wave_center
         return vel
+
+    def _speciesname(self,ion):
+        """Determine the species"""
+        romannum=['I','II','III','IV','V','VI','VII','VIII','IX','X']
+        if ion[1:] not in romannum:
+            ionname=ion[0:2]
+            trans=ion[2:]
+        else:
+            ionname=ion[0:1]
+            trans=ion[1:]
+        return ionname,roman.fromRoman(trans)
+
     
     def _btherm(self, te, mass):
-        """Calculate thermal broadening (from your original function)."""
+        """Calculate thermal broadening"""
         return (0.0166289252 * 10**te / mass)**0.5
     
     def _Nxpiethin(self, Z_val, Hden_val, NHI_val, ion):
-        """Interpolate thin grid (from your original function)."""
+        """Interpolate thin grid"""
         try:
             N = self.grids['Nipiethin'][ion]([Z_val, Hden_val])[0] + (NHI_val - 14.0)
             T = self.grids['Nipiethin']['logT']([Z_val, Hden_val])[0]
@@ -428,7 +387,7 @@ class CMBMFitter:
             return np.nan, np.nan
     
     def _Nxpiethick(self, Z_val, Hden_val, NHI_val, ion):
-        """Interpolate thick grid (from your original function)."""
+        """Interpolate thick grid"""
         try:
             N = self.grids['Nipiethick'][ion]([Z_val, Hden_val, NHI_val])[0]
             T = self.grids['Nipiethick']['logT']([Z_val, Hden_val, NHI_val])[0]
@@ -438,7 +397,7 @@ class CMBMFitter:
     
     def _eval_comb_profile(self, x, infos, z_sys, ion, trans, species, kernel, 
                           sampling=3, kernel_nsub=1):
-        """Evaluate combined profile (from your original function)."""
+        """Evaluate combined profile"""
         if isinstance(kernel, float):
             dx = np.mean(np.diff(x))
             xmin = np.log10(x.min() - 50*dx)
@@ -494,13 +453,27 @@ class CMBMFitter:
         
         vel = const.c.cgs.value*1e-5*(x-l_center)/(l_center)
         return vel, profile_obs
+
+
+    def _apply_alpha(self, N, item, alpha_vals):
+        """Apply abundance offset if item's element matches an alpha parameter."""
+        if not alpha_vals:
+            return N
+        elem = self._speciesname(item)[0]   # e.g. 'Mg', 'N', 'C', 'Si', ...
+        for alpha_name, alpha_val in alpha_vals.items():
+            if ALPHA_ELEMENT_MAP.get(alpha_name) == elem:
+                return N + alpha_val
+        return N
+
+
     
     def _cmodel(self, pars):
-        """Cloud model evaluation (from your original cmodel function)."""
+        """Cloud model evaluation"""
         phases = self.config['phases']
         use_lines = self.config['use_lines']
         interest_ions = list(set([line.split('_')[0] for line in use_lines]))
-        
+        interest_ions = [ion for ion in interest_ions if ion in self.grids['Nipiethin']]
+        alpha_params = self.config.get('alpha_params', {})
         allphases = []
         param_idx = 0
         
@@ -516,6 +489,7 @@ class CMBMFitter:
             for cloud in range(n_clouds):
                 s_cloud = str(cloud)
                 vcloud = str(optim_ions[cloud][1])
+                component = components[cloud]
                 allinfo[s_cloud] = OrderedDict()
                 
                 # Extract parameters for this cloud
@@ -525,6 +499,16 @@ class CMBMFitter:
                 bturb = pars[param_idx + 3]
                 z = pars[param_idx + 4]
                 param_idx += 5
+
+
+                # --- Alpha parameters for this cloud (0 or more) ---
+                cloud_alphas = alpha_params.get(component, [])
+                alpha_vals = {}
+                for alpha_name in cloud_alphas:
+                    alpha_vals[alpha_name] = pars[param_idx]
+                    param_idx += 1
+
+
                 
                 for item in interest_ions:
                     weight = self.species[item][list(self.species[item].keys())[0]][2]
@@ -536,7 +520,13 @@ class CMBMFitter:
                         N, te = self._Nxpiethick(Z, nH, NHI, item)
                     
                     b = ((bturb)**2 + (self._btherm(te, weight))**2)**0.5
-                    allinfo[s_cloud][item] = z, b, 10**N
+                    # Apply alpha offset if element matches
+
+                    N_final = self._apply_alpha(N, item, alpha_vals)
+
+                    allinfo[s_cloud][item] = z, b, 10**N_final
+
+
             
             allphases.append(allinfo)
 
@@ -552,7 +542,7 @@ class CMBMFitter:
             for trans in self.species[ion]:
                 line_id = f'{ion}_{trans}'
                 if line_id in use_lines and line_id in self.dataset.all_lines:
-                    line_obj = self.dataset.find_line(line_id)[0]
+                    line_obj = self.dataset.find_line(line_id)[-1]
                     x = line_obj.wl
                     kernel = line_obj.kernel
                     
@@ -572,6 +562,15 @@ class CMBMFitter:
         parameters = []
         minval = []
         maxval = []
+
+        alpha_params = self.config.get('alpha_params', {})
+        alpha_bounds = self.config.get('alpha_bounds', {})  # e.g. {'Mgalpha': [-1.0, 1.0]}
+
+        prior_settings = self.config.get('prior_settings', {})
+        z_sigma     = prior_settings.get('z_sigma', 2)
+        bturb_sigma = prior_settings.get('bturb_sigma', 2)
+        NHI_min = prior_settings['NHI_min']
+        NHI_max = prior_settings['NHI_max']
         
         for phase_name, components in self.config['phases'].items():
             for component in components:
@@ -588,44 +587,50 @@ class CMBMFitter:
                     param_type = param_name.split('_')[-1]
                     
                     if param_type == 'z':
-                        # Use VoigtFit results if available
                         z_val = self.voigt_data[ion][comp_id]['z'][0]
                         z_err = self.voigt_data[ion][comp_id]['z'][1]
-                        minval.append(z_val - 5*z_err)
-                        maxval.append(z_val + 5*z_err)
+                        minval.append(z_val - z_sigma * z_err)
+                        maxval.append(z_val + z_sigma * z_err)
                     
                     elif param_type == 'Z':
-                        df = self.grids['df_pie']['METALS']
-                        minval.append(min(df))
-                        maxval.append(max(df))
-                    
+                        Z_axis = self.grids['Nipiethin']['logT'].grid[0]
+                        minval.append(float(Z_axis.min()))
+                        maxval.append(float(Z_axis.max()))
+
                     elif param_type == 'nH':
-                        df = self.grids['df_pie']['HDEN']
-                        minval.append(min(df))
-                        maxval.append(max(df))
+                        nH_axis = self.grids['Nipiethin']['logT'].grid[1]
+                        minval.append(float(nH_axis.min()))
+                        maxval.append(float(nH_axis.max()))
                     
                     elif param_type == 'NHI':
-                        minval.append(self.config.get('parameter_bounds', {}).get('NHI_min', 12.0))
-                        maxval.append(self.config.get('parameter_bounds', {}).get('NHI_max', 21.5))
+                        minval.append(NHI_min)
+                        maxval.append(NHI_max)
                     
                     elif param_type == 'bturb':
                         b_val = self.voigt_data[ion][comp_id]['b'][0]
                         b_err = self.voigt_data[ion][comp_id]['b'][1]
                         minval.append(0)
-                        maxval.append(b_val + 3*b_err)
+                        maxval.append(b_val + bturb_sigma * b_err)
+
+
+                for alpha in alpha_params.get(component, []):
+                    parameters.append(f"{base_name}_{alpha}")
+                    bounds = alpha_bounds.get(alpha, [-1.0, 1.0])
+                    minval.append(bounds[0])
+                    maxval.append(bounds[1])                
 
         
         return parameters, minval, maxval
     
     def _prior(self, pars, minval, maxval):
-        """Prior transform (from your original prior function)."""
+        """Prior transform"""
         params = pars.copy()
         for i in range(len(pars)):
             params[i] = minval[i] + (maxval[i] - minval[i]) * pars[i]
         return params
     
     def _ln_likelihood(self, pars):
-        """Log likelihood (from your original ln_likelihood function)."""
+        """Log likelihood"""
         try:
             model_data = self._cmodel(pars)
             resid = []
