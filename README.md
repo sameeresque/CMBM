@@ -5,6 +5,12 @@
 
 **CMBM** is a Python package for fitting astronomical absorption line systems using nested sampling and Cloudy photoionization models. It enables robust Bayesian parameter estimation for complex multi-phase circumgalactic and intergalactic medium absorption systems.
 
+<p align="center">
+  <img src="docs/cmbm_logo.png" alt="CMBM: from observed quasar spectra to physical properties of diffuse gas" width="750"/>
+  <br>
+  <em>CMBM takes you from observed quasar spectra to the physical properties of the diffuse gas surrounding galaxies — metallicity, density, temperature, size, and more — one cloud at a time.</em>
+</p>
+
 ## Table of Contents
 
 - [Key Features](#key-features)
