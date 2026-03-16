@@ -41,6 +41,8 @@
 
 Install from source preferrably in a virtual environment:
 ```bash
+python3 -m venv cmbm_env
+source cmbm_env/bin/activate/
 git clone https://github.com/sameeresque/cmbm.git
 cd cmbm
 pip install -e .
