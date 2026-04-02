@@ -559,4 +559,6 @@ Thanks to the authors of these essential softwares and packages.
 
 ---
 
-**Happy fitting!** 🌟
+I welcome collaborations and am happy to work with researchers interested in applying CMBM to their absorption line systems. If you are working on quasar absorption lines, CGM/IGM science, or related topics and would like to explore a potential collaboration, feel free to reach out. 📧 sameer@ou.edu
+
+
