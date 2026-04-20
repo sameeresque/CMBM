@@ -105,44 +105,19 @@ class CMBMFitter:
         print("CMBMFitter initialized")
     
     def _load_config(self, config_file, **kwargs):
-        """Load configuration from file and/or direct parameters."""
-        # Start with default configuration
-        config = self._get_default_config()
+        """Load configuration from user-supplied file."""
+        if not config_file:
+            raise ValueError("A config file must be supplied.")
         
-        # Override with config file if provided
-        if config_file:
-            with open(config_file, 'r') as f:
-                user_config = yaml.safe_load(f)
-            self._update_nested_dict(config, user_config)
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
         
-        # Override with direct parameters
+        # Override with direct parameters if supplied
         for key, value in kwargs.items():
             config[key] = value
         
         return config
     
-    def _get_default_config(self):
-        """Load default configuration from YAML file."""
-        from pathlib import Path
-        import yaml
-        
-        config_dir = Path(__file__).parent / 'config'
-        default_config_path = config_dir / 'default_config.yaml'
-        
-        if not default_config_path.exists():
-            raise FileNotFoundError(f"Default config not found: {default_config_path}")
-        
-        with open(default_config_path, 'r') as f:
-            return yaml.safe_load(f)
-    
-    def _update_nested_dict(self, base_dict, update_dict):
-        """Recursively update nested dictionary."""
-        for key, value in update_dict.items():
-            if (key in base_dict and isinstance(base_dict[key], dict) 
-                and isinstance(value, dict)):
-                self._update_nested_dict(base_dict[key], value)
-            else:
-                base_dict[key] = value
     
     def load_data(self):
         """Load all required data files."""
